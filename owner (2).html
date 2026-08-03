@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Owner Dashboard</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Raleway:wght@400;500;600;700&display=swap');
+:root{
+  --bg:#0a0805; --surface:#110e08; --border:#2a2010;
+  --gold:#c9a84c; --gold-hi:#f0d080; --gold-deep:#8b6914;
+  --veg:#4caf50; --nonveg:#e53935;
+  --new:#f57f17; --preparing:#5b8def; --ready:#2e7d32; --completed:#6b6458; --cancelled:#e53935;
+  --text:#ece3cf; --muted:#8a8070;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--bg); color:var(--text); font-family:'Raleway',sans-serif; min-height:100vh;}
+
+/* PASSCODE GATE */
+#gate{position:fixed; inset:0; background:var(--bg); z-index:100; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;}
+#gate h1{font-family:'Cinzel',serif; color:var(--gold-hi); font-size:1.4rem;}
+#gate input{padding:12px 16px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); text-align:center; font-size:1.1rem; letter-spacing:.2em; width:180px;}
+#gate button{padding:11px 24px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--gold),var(--gold-deep)); color:#0a0805; font-weight:700; cursor:pointer; font-family:'Cinzel',serif;}
+#gate .err{color:var(--nonveg); font-size:.8rem; height:16px;}
+
+#app{display:none;}
+#app.show{display:block;}
+
+header{position:sticky; top:0; z-index:20; background:rgba(10,8,5,.95); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border); padding:14px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;}
+header h1{font-family:'Cinzel',serif; color:var(--gold-hi); font-size:1.15rem;}
+.live-dot{display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--ready); margin-right:6px; animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.3;}}
+.logout{font-size:.75rem; color:var(--muted); cursor:pointer; border:1px solid var(--border); padding:6px 12px; border-radius:8px;}
+
+.stats{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; padding:16px 20px;}
+@media(min-width:700px){.stats{grid-template-columns:repeat(4,1fr);}}
+.stat-card{background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px;}
+.stat-card .label{font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em;}
+.stat-card .val{font-family:'Cinzel',serif; font-size:1.6rem; color:var(--gold-hi); margin-top:6px;}
+
+.controls{display:flex; gap:10px; padding:0 20px 12px; flex-wrap:wrap; align-items:center;}
+.controls select, .controls input{padding:8px 12px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:.82rem;}
+.status-tabs{display:flex; gap:8px; flex-wrap:wrap;}
+.status-tab{padding:6px 14px; border-radius:20px; font-size:.78rem; border:1px solid var(--border); color:var(--muted); cursor:pointer;}
+.status-tab.active{border-color:var(--gold); color:var(--gold-hi); background:rgba(201,168,76,.1);}
+
+.orders-grid{display:grid; gap:14px; padding:0 20px 60px; grid-template-columns:1fr;}
+@media(min-width:760px){.orders-grid{grid-template-columns:1fr 1fr;}}
+@media(min-width:1140px){.orders-grid{grid-template-columns:1fr 1fr 1fr;}}
+
+.order-card{background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--new); border-radius:12px; padding:16px; animation:slideIn .3s ease;}
+@keyframes slideIn{from{opacity:0; transform:translateY(-8px);} to{opacity:1; transform:translateY(0);}}
+.order-card.status-preparing{border-left-color:var(--preparing);}
+.order-card.status-ready{border-left-color:var(--ready);}
+.order-card.status-completed{border-left-color:var(--completed); opacity:.6;}
+.order-card.status-cancelled{border-left-color:var(--cancelled); opacity:.5;}
+.oc-head{display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;}
+.oc-num{font-family:'Cinzel',serif; color:var(--gold-hi); font-weight:700;}
+.oc-time{font-size:.7rem; color:var(--muted);}
+.oc-meta{font-size:.8rem; color:var(--muted); margin-bottom:8px; display:flex; gap:10px; flex-wrap:wrap;}
+.oc-tag{padding:2px 8px; border-radius:8px; font-size:.68rem; border:1px solid var(--border);}
+.oc-items{margin:8px 0; font-size:.85rem;}
+.oc-item{display:flex; justify-content:space-between; padding:3px 0; border-bottom:1px dashed var(--border);}
+.oc-item .nm{flex:1;}
+.oc-item .note{font-size:.68rem; color:var(--muted); font-style:italic; display:block;}
+.oc-total{display:flex; justify-content:space-between; font-family:'Cinzel',serif; color:var(--gold-hi); font-weight:700; margin-top:8px; padding-top:8px; border-top:1px solid var(--border);}
+.oc-note{font-size:.75rem; color:var(--gold); margin-top:6px; font-style:italic;}
+.oc-actions{display:flex; gap:6px; margin-top:12px; flex-wrap:wrap;}
+.oc-actions button{flex:1; min-width:90px; padding:8px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text); font-size:.75rem; cursor:pointer;}
+.oc-actions button.primary{background:var(--gold); color:#0a0805; border-color:var(--gold); font-weight:700;}
+.oc-actions button.danger{color:var(--nonveg); border-color:var(--nonveg);}
+.status-label{font-size:.68rem; padding:2px 10px; border-radius:10px; font-weight:700; text-transform:uppercase;}
+.status-label.new{background:rgba(245,127,23,.15); color:#ffc26b;}
+.status-label.preparing{background:rgba(91,141,239,.15); color:#9db9f7;}
+.status-label.ready{background:rgba(46,125,50,.15); color:#7fd382;}
+.status-label.completed{background:rgba(107,100,88,.2); color:var(--muted);}
+.status-label.cancelled{background:rgba(229,57,53,.12); color:#ff9a97;}
+
+.empty{text-align:center; color:var(--muted); padding:80px 20px; grid-column:1/-1;}
+
+/* NEW ORDER TOAST */
+#toastStack{position:fixed; top:80px; right:20px; z-index:90; display:flex; flex-direction:column; gap:10px; max-width:320px;}
+.new-order-toast{
+  background:linear-gradient(135deg, var(--gold), var(--gold-deep)); color:#0a0805; border-radius:12px;
+  padding:14px 16px; box-shadow:0 6px 24px rgba(201,168,76,.4); cursor:pointer;
+  animation:toastIn .35s ease, toastPulse 1s ease infinite;
+  display:flex; align-items:center; gap:10px;
+}
+.new-order-toast.leaving{animation:toastOut .3s ease forwards;}
+@keyframes toastIn{from{opacity:0; transform:translateX(40px);} to{opacity:1; transform:translateX(0);}}
+@keyframes toastOut{to{opacity:0; transform:translateX(40px);}}
+@keyframes toastPulse{0%,100%{box-shadow:0 6px 24px rgba(201,168,76,.4);} 50%{box-shadow:0 6px 30px rgba(201,168,76,.75);}}
+.new-order-toast .bell{font-size:1.4rem;}
+.new-order-toast .body b{font-family:'Cinzel',serif; display:block; font-size:.95rem;}
+.new-order-toast .body span{font-size:.75rem; opacity:.85;}
+#tabTitleFlash{display:none;}
+</style>
+</head>
+<body>
+
+<div id="gate">
+  <h1>Owner Dashboard</h1>
+  <input type="password" id="passInput" placeholder="Enter passcode" maxlength="12">
+  <button onclick="checkPass()">Unlock</button>
+  <div class="err" id="gateErr"></div>
+</div>
+
+<div id="app">
+  <header>
+    <h1><span class="live-dot"></span><span id="restName">Restaurant</span> — Live Orders</h1>
+    <span class="logout" onclick="logout()">Lock dashboard</span>
+  </header>
+
+  <div class="stats">
+    <div class="stat-card"><div class="label">Orders Today</div><div class="val" id="statOrdersToday">0</div></div>
+    <div class="stat-card"><div class="label">Sales Today</div><div class="val" id="statSalesToday">₹0</div></div>
+    <div class="stat-card"><div class="label">Active Orders</div><div class="val" id="statActive">0</div></div>
+    <div class="stat-card"><div class="label">All-Time Orders</div><div class="val" id="statAllTime">0</div></div>
+  </div>
+
+  <div class="controls">
+    <div class="status-tabs" id="statusTabs">
+      <div class="status-tab active" data-s="active">Active</div>
+      <div class="status-tab" data-s="new">New</div>
+      <div class="status-tab" data-s="preparing">Preparing</div>
+      <div class="status-tab" data-s="ready">Ready</div>
+      <div class="status-tab" data-s="completed">Completed</div>
+      <div class="status-tab" data-s="all">All</div>
+    </div>
+    <input type="text" id="searchOrders" placeholder="Search by room, name, order #...">
+  </div>
+
+  <div class="orders-grid" id="ordersGrid"></div>
+</div>
+
+<div id="toastStack"></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(CONFIG.firebase);
+const db = getFirestore(app);
+window.__db = db;
+window.__fs = { collection, onSnapshot, doc, updateDoc, query, orderBy };
+window.dispatchEvent(new Event("firebase-ready"));
+</script>
+<script>
+document.getElementById('restName').textContent = CONFIG.restaurantName;
+
+/* ---------- PASSCODE GATE ---------- */
+function checkPass(){
+  const val = document.getElementById('passInput').value;
+  if(val === CONFIG.ownerPasscode){
+    sessionStorage.setItem('ownerUnlocked','1');
+    document.getElementById('gate').style.display='none';
+    document.getElementById('app').classList.add('show');
+    startListening();
+  } else {
+    document.getElementById('gateErr').textContent = 'Incorrect passcode';
+  }
+}
+document.getElementById('passInput').addEventListener('keydown', e=>{ if(e.key==='Enter') checkPass(); });
+function logout(){
+  sessionStorage.removeItem('ownerUnlocked');
+  location.reload();
+}
+if(sessionStorage.getItem('ownerUnlocked')==='1'){
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').classList.add('show');
+}
+
+/* ---------- STATE ---------- */
+let allOrders = [];
+let activeStatusFilter = 'active';
+let searchTerm = '';
+let knownIds = new Set();
+let firstLoad = true;
+
+document.getElementById('statusTabs').addEventListener('click', e=>{
+  if(!e.target.classList.contains('status-tab')) return;
+  document.querySelectorAll('.status-tab').forEach(t=>t.classList.remove('active'));
+  e.target.classList.add('active');
+  activeStatusFilter = e.target.dataset.s;
+  render();
+});
+document.getElementById('searchOrders').addEventListener('input', e=>{
+  searchTerm = e.target.value.trim().toLowerCase();
+  render();
+});
+
+function startListening(){
+  if(!window.__fs) return waitForFirebase();
+  const { collection, onSnapshot, query, orderBy } = window.__fs;
+  const q = query(collection(window.__db, 'orders'), orderBy('createdAt','desc'));
+  onSnapshot(q, snap=>{
+    allOrders = snap.docs.map(d=>({ id:d.id, ...d.data() }));
+    if(!firstLoad){
+      const newOnes = allOrders.filter(o=>!knownIds.has(o.id) && o.status==='new');
+      if(newOnes.length){
+        playChime();
+        newOnes.forEach(showNewOrderToast);
+        flashTabTitle(newOnes.length);
+      }
+    }
+    allOrders.forEach(o=>knownIds.add(o.id));
+    firstLoad = false;
+    render();
+  });
+}
+function waitForFirebase(){
+  window.addEventListener('firebase-ready', startListening, {once:true});
+}
+if(sessionStorage.getItem('ownerUnlocked')==='1') startListening();
+// also hook so it starts right after unlocking even if firebase wasn't ready yet
+const origCheck = checkPass;
+
+function playChime(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const o = ctx.createOscillator(); const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = 0.15;
+    o.start(); o.stop(ctx.currentTime + 0.25);
+  }catch(e){}
+}
+
+function showNewOrderToast(order){
+  const stack = document.getElementById('toastStack');
+  const t = document.createElement('div');
+  t.className = 'new-order-toast';
+  const label = order.orderType==='takeaway' ? 'Takeaway' : `Room ${order.roomNumber}`;
+  t.innerHTML = `
+    <span class="bell">🔔</span>
+    <div class="body">
+      <b>New Order — ${order.orderNumber}</b>
+      <span>${label} · ${CONFIG.currency}${order.total}</span>
+    </div>`;
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.status-tab').forEach(tab=>tab.classList.toggle('active', tab.dataset.s==='new'));
+    activeStatusFilter = 'new';
+    render();
+    t.remove();
+  });
+  stack.appendChild(t);
+  setTimeout(()=>{
+    t.classList.add('leaving');
+    setTimeout(()=>t.remove(), 300);
+  }, 8000);
+}
+
+let originalTitle = document.title;
+let titleFlashTimer;
+function flashTabTitle(count){
+  clearInterval(titleFlashTimer);
+  let on = false;
+  titleFlashTimer = setInterval(()=>{
+    document.title = on ? originalTitle : `🔔 ${count} New Order${count>1?'s':''}!`;
+    on = !on;
+  }, 1000);
+  const stop = ()=>{
+    clearInterval(titleFlashTimer);
+    document.title = originalTitle;
+    window.removeEventListener('focus', stop);
+  };
+  window.addEventListener('focus', stop);
+}
+
+function isToday(ts){
+  if(!ts) return false;
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  const now = new Date();
+  return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
+}
+function fmtTime(ts){
+  if(!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function updateStats(){
+  const todays = allOrders.filter(o=>isToday(o.createdAt));
+  const salesToday = todays.filter(o=>o.status!=='cancelled').reduce((s,o)=>s+(o.total||0),0);
+  const active = allOrders.filter(o=>['new','preparing','ready'].includes(o.status));
+  document.getElementById('statOrdersToday').textContent = todays.length;
+  document.getElementById('statSalesToday').textContent = CONFIG.currency + salesToday;
+  document.getElementById('statActive').textContent = active.length;
+  document.getElementById('statAllTime').textContent = allOrders.length;
+}
+
+function matchesFilter(o){
+  if(activeStatusFilter==='active'){ if(!['new','preparing','ready'].includes(o.status)) return false; }
+  else if(activeStatusFilter!=='all'){ if(o.status!==activeStatusFilter) return false; }
+  if(searchTerm){
+    const hay = `${o.orderNumber} ${o.roomNumber} ${o.customerName}`.toLowerCase();
+    if(!hay.includes(searchTerm)) return false;
+  }
+  return true;
+}
+
+function render(){
+  updateStats();
+  const grid = document.getElementById('ordersGrid');
+  const list = allOrders.filter(matchesFilter);
+  if(list.length===0){
+    grid.innerHTML = `<div class="empty">No orders here yet.</div>`;
+    return;
+  }
+  grid.innerHTML = list.map(o=>{
+    const itemsHtml = (o.items||[]).map(i=>`
+      <div class="oc-item">
+        <span class="nm">${i.name} × ${i.qty}${i.note?`<span class="note">📝 ${i.note}</span>`:''}</span>
+        <span>${CONFIG.currency}${i.price*i.qty}</span>
+      </div>`).join('');
+    const nextActions = statusActions(o);
+    return `
+    <div class="order-card status-${o.status}">
+      <div class="oc-head">
+        <div>
+          <div class="oc-num">${o.orderNumber}</div>
+          <div class="oc-time">${fmtTime(o.createdAt)}</div>
+        </div>
+        <span class="status-label ${o.status}">${o.status}</span>
+      </div>
+      <div class="oc-meta">
+        <span class="oc-tag">${o.orderType==='takeaway' ? '🥡 Takeaway' : '🚪 Room '+o.roomNumber+(o.floorNumber ? ' (Floor '+o.floorNumber+')' : '')}</span>
+        <span class="oc-tag">${o.customerName} · ${o.customerPhone}</span>
+      </div>
+      <div class="oc-items">${itemsHtml}</div>
+      ${o.specialInstructions ? `<div class="oc-note">💬 ${o.specialInstructions}</div>` : ''}
+      <div class="oc-total"><span>Total</span><span>${CONFIG.currency}${o.total}</span></div>
+      <div class="oc-actions">${nextActions}</div>
+    </div>`;
+  }).join('');
+}
+
+function statusActions(o){
+  if(o.status==='new'){
+    return `<button class="primary" onclick="setStatus('${o.id}','preparing')">Start Preparing</button>
+            <button class="danger" onclick="setStatus('${o.id}','cancelled')">Cancel</button>`;
+  }
+  if(o.status==='preparing'){
+    return `<button class="primary" onclick="setStatus('${o.id}','ready')">Mark Ready</button>
+            <button class="danger" onclick="setStatus('${o.id}','cancelled')">Cancel</button>`;
+  }
+  if(o.status==='ready'){
+    return `<button class="primary" onclick="setStatus('${o.id}','completed')">Mark Served / Completed</button>`;
+  }
+  if(o.status==='completed'){
+    return `<span style="font-size:.75rem; color:var(--muted);">Completed</span>`;
+  }
+  if(o.status==='cancelled'){
+    return `<span style="font-size:.75rem; color:var(--muted);">Cancelled</span>`;
+  }
+  return '';
+}
+
+async function setStatus(id, status){
+  const { doc, updateDoc } = window.__fs;
+  try{
+    await updateDoc(doc(window.__db, 'orders', id), { status });
+  }catch(err){
+    alert('Could not update order status. Check your connection.');
+    console.error(err);
+  }
+}
+</script>
+</body>
+</html>
