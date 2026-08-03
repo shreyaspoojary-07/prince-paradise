@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Track Order</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Cinzel:wght@500;600;700&family=Raleway:wght@400;500;600;700&display=swap');
+:root{
+  --bg:#0a0805; --surface:#110e08; --border:#2a2010;
+  --gold:#c9a84c; --gold-hi:#f0d080; --gold-deep:#8b6914;
+  --nonveg:#e53935;
+  --text:#ece3cf; --muted:#8a8070;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{
+  background:var(--bg); color:var(--text); font-family:'Raleway',sans-serif;
+  min-height:100vh; display:flex; align-items:flex-start; justify-content:center; padding:40px 16px;
+}
+.wrap{width:100%; max-width:480px;}
+.brand{text-align:center; font-family:'Cinzel',serif; color:var(--gold-hi); letter-spacing:.08em; font-size:1rem; margin-bottom:6px;}
+h1{font-family:'Cinzel Decorative',serif; text-align:center; color:var(--gold-hi); font-size:1.7rem; margin-bottom:8px;
+  text-shadow:0 0 26px rgba(201,168,76,.3);}
+.sub{text-align:center; color:var(--muted); font-size:.85rem; margin-bottom:26px;}
+
+.search-box{display:flex; gap:8px; margin-bottom:20px;}
+.search-box input{
+  flex:1; padding:13px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface);
+  color:var(--text); font-family:'Raleway',sans-serif; font-size:.95rem; text-transform:uppercase;
+}
+.search-box input:focus{outline:none; border-color:var(--gold);}
+.search-box button{
+  padding:13px 20px; border:none; border-radius:10px; cursor:pointer; font-weight:700; font-family:'Cinzel',serif;
+  background:linear-gradient(135deg,var(--gold),var(--gold-deep)); color:#0a0805;
+}
+.hint{text-align:center; color:var(--muted); font-size:.72rem; margin-bottom:20px;}
+.error-msg{text-align:center; color:var(--nonveg); font-size:.85rem; margin-bottom:16px; display:none;}
+.loading{text-align:center; color:var(--muted); font-size:.85rem; display:none; padding:20px;}
+
+#result{display:none;}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:22px;}
+.card .onum{font-family:'Cinzel',serif; color:var(--gold-hi); font-size:1.2rem; text-align:center;}
+.card .meta{text-align:center; color:var(--muted); font-size:.8rem; margin:6px 0 20px;}
+
+.status-steps{display:flex; justify-content:space-between; position:relative;}
+.status-steps::before{content:""; position:absolute; top:9px; left:24px; right:24px; height:2px; background:var(--border); z-index:0;}
+.status-step{position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; gap:6px; flex:1;}
+.status-step .dot{width:20px; height:20px; border-radius:50%; background:var(--surface); border:2px solid var(--border); transition:.3s;}
+.status-step .lbl{font-size:.68rem; color:var(--muted); transition:.3s;}
+.status-step.done .dot{background:var(--gold); border-color:var(--gold);}
+.status-step.done .lbl{color:var(--gold-hi);}
+.status-step.current .dot{background:var(--gold-hi); border-color:var(--gold-hi); box-shadow:0 0 0 4px rgba(201,168,76,.25); animation:stepPulse 1.2s infinite;}
+.status-step.current .lbl{color:var(--gold-hi); font-weight:700;}
+@keyframes stepPulse{0%,100%{box-shadow:0 0 0 4px rgba(201,168,76,.25);} 50%{box-shadow:0 0 0 8px rgba(201,168,76,.1);}}
+.status-step.cancelled .dot{background:var(--nonveg); border-color:var(--nonveg);}
+
+.status-message{margin-top:18px; text-align:center; font-weight:600; color:var(--gold-hi); font-size:.95rem;}
+.divider{height:1px; background:var(--border); margin:18px 0;}
+.item-row{display:flex; justify-content:space-between; font-size:.85rem; padding:5px 0; color:var(--text);}
+.item-row .note{display:block; font-size:.7rem; color:var(--muted); font-style:italic;}
+.total-row{display:flex; justify-content:space-between; font-family:'Cinzel',serif; color:var(--gold-hi); font-weight:700; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
+
+.back-link{display:block; text-align:center; margin-top:24px; color:var(--muted); font-size:.8rem; text-decoration:none;}
+.back-link:hover{color:var(--gold-hi);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand" id="brandName">Restaurant</div>
+  <h1>Track My Order</h1>
+  <p class="sub">Enter your order number to see live status</p>
+
+  <div class="search-box">
+    <input type="text" id="orderInput" placeholder="e.g. ORD-1001">
+    <button onclick="trackOrder()">Track</button>
+  </div>
+  <p class="hint">Your order number was shown on the confirmation screen after ordering.</p>
+  <p class="error-msg" id="errorMsg"></p>
+  <div class="loading" id="loadingMsg">Looking up your order...</div>
+
+  <div id="result">
+    <div class="card">
+      <div class="onum" id="resultOrderNum"></div>
+      <div class="meta" id="resultMeta"></div>
+
+      <div class="status-steps" id="statusSteps">
+        <div class="status-step" data-step="new"><span class="dot"></span><span class="lbl">Received</span></div>
+        <div class="status-step" data-step="preparing"><span class="dot"></span><span class="lbl">Preparing</span></div>
+        <div class="status-step" data-step="ready"><span class="dot"></span><span class="lbl">Ready</span></div>
+        <div class="status-step" data-step="completed"><span class="dot"></span><span class="lbl">Served</span></div>
+      </div>
+      <p class="status-message" id="statusMessage"></p>
+
+      <div class="divider"></div>
+      <div id="itemsList"></div>
+      <div class="total-row"><span>Total</span><span id="resultTotal"></span></div>
+    </div>
+  </div>
+
+  <a class="back-link" href="customer.html">← Back to menu</a>
+</div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getFirestore, collection, query, where, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp(CONFIG.firebase);
+const db = getFirestore(app);
+window.__db = db;
+window.__fs = { collection, query, where, getDocs, onSnapshot };
+window.dispatchEvent(new Event("firebase-ready"));
+</script>
+<script>
+document.getElementById('brandName').textContent = CONFIG.restaurantName;
+
+let firebaseReady = false;
+window.addEventListener('firebase-ready', () => { firebaseReady = true; maybeAutoTrack(); });
+
+const STATUS_STEPS = ['new','preparing','ready','completed'];
+const STATUS_MESSAGES = {
+  new: '🎉 Your order has been received by the kitchen.',
+  preparing: '👨‍🍳 The kitchen is preparing your order now.',
+  ready: '✅ Your order is ready!',
+  completed: '🍽️ Order served — enjoy your meal!',
+  cancelled: '⚠️ This order was cancelled. Please speak to staff.'
+};
+
+let currentUnsub = null;
+
+function showError(msg){
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+async function trackOrder(){
+  const raw = document.getElementById('orderInput').value.trim().toUpperCase();
+  if(!raw){ showError('Please enter your order number.'); return; }
+  const orderNumber = raw.startsWith('ORD-') ? raw : 'ORD-' + raw.replace(/^ORD-?/,'');
+
+  showError('');
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('loadingMsg').style.display = 'block';
+
+  if(!firebaseReady){
+    showError('Still connecting… please try again in a moment.');
+    document.getElementById('loadingMsg').style.display = 'none';
+    return;
+  }
+
+  try{
+    const { collection, query, where, getDocs, onSnapshot } = window.__fs;
+    const q = query(collection(window.__db, 'orders'), where('orderNumber', '==', orderNumber));
+    const snap = await getDocs(q);
+    document.getElementById('loadingMsg').style.display = 'none';
+
+    if(snap.empty){
+      showError(`No order found with number ${orderNumber}. Double-check and try again.`);
+      return;
+    }
+
+    const docSnap = snap.docs[0];
+    localStorage.setItem('lastOrderNumber', orderNumber);
+
+    if(currentUnsub) currentUnsub();
+    currentUnsub = onSnapshot(docSnap.ref, liveSnap=>{
+      if(!liveSnap.exists()) return;
+      renderOrder(liveSnap.data());
+    });
+  }catch(err){
+    document.getElementById('loadingMsg').style.display = 'none';
+    showError('Something went wrong looking up your order. Please try again.');
+    console.error(err);
+  }
+}
+
+function renderOrder(order){
+  document.getElementById('result').style.display = 'block';
+  document.getElementById('resultOrderNum').textContent = order.orderNumber;
+  const label = order.orderType==='takeaway' ? 'Takeaway' : `Room ${order.roomNumber}`;
+  document.getElementById('resultMeta').textContent = `${label} · ${order.customerName}`;
+
+  const idx = STATUS_STEPS.indexOf(order.status);
+  document.querySelectorAll('.status-step').forEach(el=>{
+    const stepIdx = STATUS_STEPS.indexOf(el.dataset.step);
+    el.classList.remove('done','current','cancelled');
+    if(order.status==='cancelled'){ el.classList.add('cancelled'); return; }
+    if(stepIdx < idx) el.classList.add('done');
+    else if(stepIdx === idx) el.classList.add('current');
+  });
+  document.getElementById('statusMessage').textContent = STATUS_MESSAGES[order.status] || '';
+
+  const itemsList = document.getElementById('itemsList');
+  itemsList.innerHTML = (order.items||[]).map(i=>`
+    <div class="item-row">
+      <span>${i.name} × ${i.qty}${i.note?`<span class="note">📝 ${i.note}</span>`:''}</span>
+      <span>${CONFIG.currency}${i.price*i.qty}</span>
+    </div>`).join('');
+  document.getElementById('resultTotal').textContent = `${CONFIG.currency}${order.total}`;
+}
+
+function maybeAutoTrack(){
+  const params = new URLSearchParams(location.search);
+  const fromUrl = params.get('order');
+  const lastOrder = localStorage.getItem('lastOrderNumber');
+  const prefill = fromUrl || lastOrder;
+  if(prefill){
+    document.getElementById('orderInput').value = prefill;
+    trackOrder();
+  }
+}
+
+document.getElementById('orderInput').addEventListener('keydown', e=>{
+  if(e.key==='Enter') trackOrder();
+});
+</script>
+</body>
+</html>
